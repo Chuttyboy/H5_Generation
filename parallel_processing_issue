@@ -1,0 +1,58 @@
+'''
+first import the following, here Parallel will parallelize the processing and
+delayed is the wraper.
+'''
+from joblib import Parallel, delayed
+
+'''
+Now we create a new function and copy paste everything that was previously
+inside the for loop and pass `video_idx and video_filename` as arguments.
+'''
+
+def _generator(self, video_idx, video_filename):
+    video_path = video_filename
+            if os.path.isdir(self.video_path):
+                video_path = os.path.join(self.video_path, video_filename)
+            video_basename = os.path.basename(video_path).split('.')[0]
+            video_capture = cv2.VideoCapture(video_path)
+            fps = video_capture.get(cv2.CAP_PROP_FPS)
+            n_frames = int(video_capture.get(cv2.CAP_PROP_FRAME_COUNT))
+            frame_list = []
+            picks = []
+            video_feat = None
+            video_feat_for_train = None
+            for frame_idx in tqdm(range(n_frames-1)):
+                success, frame = video_capture.read()
+                if frame_idx % 15 == 0:
+
+                    if success:
+
+                        frame_feat = self._extract_feature(frame)                    
+                        picks.append(frame_idx)
+
+                        if video_feat_for_train is None:
+                            video_feat_for_train = frame_feat
+                        else:
+                            video_feat_for_train = np.vstack((video_feat_for_train, frame_feat))
+                        if video_feat is None:
+                            video_feat = frame_feat
+                        else:
+                            video_feat = np.vstack((video_feat, frame_feat))
+                    else:
+                        break
+            video_capture.release()
+            arrmul = self._get_change_points(video_feat, n_frames, fps)
+            self.h5_file['video_{}'.format(video_idx+1)]['features'] = list(video_feat_for_train)
+            self.h5_file['video_{}'.format(video_idx+1)]['picks'] = np.array(list(picks))
+            self.h5_file['video_{}'.format(video_idx+1)]['n_frames'] = n_frames
+            self.h5_file['video_{}'.format(video_idx+1)]['fps'] = fps
+            self.h5_file['video_{}'.format(video_idx + 1)]['video_name'] = video_filename.split('.')[0]
+            self.h5_file['video_{}'.format(video_idx+1)]['change_points'] = arrmul
+
+'''
+Finally we update our current function using Parallel and delayed.
+'''
+
+def generate_dataset(self):
+    print('[INFO] CNN processing')
+    Parallel(n_jobs=-1)(delayed(self._generator)(video_idx, video_filename) for video_idx, video_filename in enumerate(self.video_list))
